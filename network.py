@@ -3,6 +3,9 @@ import random
 
 import numpy as np
 
+def sigmoid(x : float) -> float:
+        return 1 / (1 + math.exp(-x))
+
 class network:
     def __init__(self, input_nodes : int, hidden_nodes : int, hidden_layers : int, output_nodes : int, learning_rate : float):
         self.input_nodes = input_nodes
@@ -59,7 +62,7 @@ class network:
             for j in range(self.input_nodes):
                 weight += self.weights[j][i] * self.values[j]
             weight -= self.thresholds[i]
-            self.values[i] = 1 / (1 + math.exp(-weight))
+            self.values[i] = sigmoid(weight)
 
         # update the remaining hidden layers
         if self.hidden_layers > 1:
@@ -71,16 +74,16 @@ class network:
                     for k in range(offset):
                         weight += self.weights[k][j] * self.values[j]
                     weight -= self.thresholds[j]
-                    self.values[j] = 1 / (1 + math.exp(-weight))
+                    self.values[j] = sigmoid(weight)
 
         # update the output nodes
         for i in range(self.get_hidden_offset(self.hidden_layers), self.total_nodes):
             # sum weighted hidden nodes for each output node, compare threshold, apply sigmoid
             weight = 0.0
-            for j in range(self.input_nodes, self.get_hidden_offset(self.hidden_layers - 1)):
+            for j in range(self.get_hidden_offset(self.hidden_layers - 1), self.get_hidden_offset(self.hidden_layers)):
                 weight += self.weights[j][i] * self.values[j]
             weight -= self.thresholds[i]
-            self.values[i] = 1 / (1 + math.exp(-weight))
+            self.values[i] = sigmoid(weight)
 
     def processErrors(self):
         sumOfSquaredErrors = 0.0
