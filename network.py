@@ -17,7 +17,7 @@ class network:
 
         # set up the arrays
         self.values = np.zeros(self.total_nodes)
-        self.expectedValues = np.zeros(self.total_nodes)
+        self.expectedValues = np.zeros(self.output_nodes)
         self.thresholds = np.zeros(self.total_nodes)
 
         # the weight matrix is always square
@@ -37,6 +37,10 @@ class network:
     def get_hidden_offset(self, layer : int) -> int:
         # calculate the offset of a hidden layer
         return self.input_nodes + (self.hidden_nodes * layer)
+    
+    def get_output_offset(self, i : int) -> int:
+        # calculate the offset of a hidden layer
+        return self.input_nodes + (self.hidden_nodes * self.hidden_layers) + i
 
     def set_values(self, inputs : np.ndarray, expected):
         # set input values
@@ -49,9 +53,9 @@ class network:
             assert(len(expected) == self.output_nodes, 'length of expected should match the output nodes')
             offset = self.get_hidden_offset(self.hidden_layers)
             for i, val in enumerate(expected):
-                self.expectedValues[offset + i] = val
+                self.expectedValues[i] = val
         else:
-            self.expectedValues[self.total_nodes - 1] = expected
+            self.expectedValues[0] = expected
 
     def process(self):
         # update the hidden layers
@@ -89,11 +93,12 @@ class network:
         sumOfSquaredErrors = 0.0
 
         # we only look at the output nodes for error calculation
-        for i in range(self.input_nodes + self.hidden_nodes, self.total_nodes):
-            error = self.expectedValues[i] - self.values[i]
+        for i in range(self.output_nodes):
+            offset = self.get_output_offset(i)
+            error = self.expectedValues[i] - self.values[offset]
             #print error
             sumOfSquaredErrors += math.pow(error, 2)
-            outputErrorGradient = self.values[i] * (1 - self.values[i]) * error
+            outputErrorGradient = self.values[offset] * (1 - self.values[offset]) * error
             #print outputErrorGradient
 
             # now update the weights and thresholds
@@ -101,8 +106,8 @@ class network:
                 # first update for the hidden nodes to output nodes (1 layer)
                 delta = self.learning_rate * self.values[j] * outputErrorGradient
                 # print delta
-                self.weights[j][i] += delta
-                hiddenErrorGradient = self.values[j] * (1 - self.values[j]) * outputErrorGradient * self.weights[j][i]
+                self.weights[j][offset] += delta
+                hiddenErrorGradient = self.values[j] * (1 - self.values[j]) * outputErrorGradient * self.weights[j][offset]
 
                 # and then update for the input nodes to hidden nodes
                 for k in range(self.input_nodes):
@@ -116,5 +121,5 @@ class network:
 
             # update the thresholds for the output node(s)
             delta = self.learning_rate * -1 * outputErrorGradient
-            self.thresholds[i] += delta
+            self.thresholds[offset] += delta
         return sumOfSquaredErrors
