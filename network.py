@@ -51,7 +51,6 @@ class network:
         # set output values
         if hasattr(expected, "__len__"):
             assert(len(expected) == self.output_nodes, 'length of expected should match the output nodes')
-            offset = self.get_hidden_offset(self.hidden_layers)
             for i, val in enumerate(expected):
                 self.expectedValues[i] = val
         else:
