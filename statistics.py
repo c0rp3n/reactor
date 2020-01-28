@@ -5,6 +5,8 @@ import seaborn as sns
 
 from status import Status
 
+# gets the needed statistics from a dataset
+# keeps each data point / column seperate
 def get_statistics(data : np.ndarray) -> np.ndarray:
     stats = np.ndarray([7, data.shape[1]], dtype=np.float64)
     stats[0] = np.mean(data, axis=0)
@@ -25,7 +27,7 @@ def save_statistics(filename : str, stats : np.ndarray):
     for i in range(len(stats)):
         file.write(stat_types[i] + ': ')
         for i, val in enumerate(stats[i]):
-            file.write('{0:0.6f}'.format(val))
+            file.write('{0:0.2f}'.format(val))
             if i < row_len - 1:
                 file.write(', ')
         file.write('\n')

@@ -1,124 +1,40 @@
-import math
-import random
-
 import numpy as np
 
-def sigmoid(x : float) -> float:
-        return 1 / (1 + math.exp(-x))
+from sklearn.neural_network import MLPClassifier
+from sklearn.model_selection import cross_val_score
 
-class network:
-    def __init__(self, input_nodes : int, hidden_nodes : int, hidden_layers : int, output_nodes : int, learning_rate : float):
-        self.input_nodes = input_nodes
-        self.hidden_nodes = hidden_nodes
-        self.hidden_layers = hidden_layers
-        self.output_nodes = output_nodes
-        self.total_nodes = input_nodes + (hidden_nodes * hidden_layers) + output_nodes
-        self.learning_rate = learning_rate
+HIDDEN_NODES = 500
+HIDDEN_LAYERS = 2
 
-        # set up the arrays
-        self.values = np.zeros(self.total_nodes)
-        self.expectedValues = np.zeros(self.output_nodes)
-        self.thresholds = np.zeros(self.total_nodes)
+MAX_ITERATIONS = 1000
 
-        # the weight matrix is always square
-        self.weights = np.zeros((self.total_nodes, self.total_nodes))
+# setting this too low makes everything change very slowly, but too high
+# makes it jump at each and every example and oscillate. I found .5 to be good
+LEARNING_RATE = .2
 
-        # set random seed! this is so we can experiment consistently
-        random.seed('this_is-going.to be`a|long>one')
+def run_network_sec3(data_train, data_test, expected_train, expected_test):
+    file = open('results/sec3_ann.txt', 'w')
 
-        # set initial random values for weights and thresholds
-        # this is a strictly upper triangular matrix as there is no feedback
-        # loop and there inputs do not affect other inputs
-        for i in range(self.input_nodes, self.total_nodes):
-            self.thresholds[i] = random.random() / random.random()
-            for j in range(i + 1, self.total_nodes):
-                self.weights[i][j] = random.random() * 2
-    
-    def get_hidden_offset(self, layer : int) -> int:
-        # calculate the offset of a hidden layer
-        return self.input_nodes + (self.hidden_nodes * layer)
-    
-    def get_output_offset(self, i : int) -> int:
-        # calculate the offset of a hidden layer
-        return self.input_nodes + (self.hidden_nodes * self.hidden_layers) + i
+    clf = MLPClassifier(solver='lbfgs',
+                        alpha=1e-5,
+                        hidden_layer_sizes=(HIDDEN_NODES, HIDDEN_NODES),
+                        random_state=1)
 
-    def set_values(self, inputs : np.ndarray, expected):
-        # set input values
-        assert(len(inputs) == self.input_nodes, 'length of input should match the input nodes')
-        for i, val in enumerate(inputs):
-            self.values[i] = val
+    clf.fit(data_train, expected_train)
 
-        # set output values
-        if hasattr(expected, "__len__"):
-            assert(len(expected) == self.output_nodes, 'length of expected should match the output nodes')
-            for i, val in enumerate(expected):
-                self.expectedValues[i] = val
-        else:
-            self.expectedValues[0] = expected
+    file.write('ANN - Accuracy: {}\n'.format(clf.score(data_test, expected_test)))
+    file.close()
 
-    def process(self):
-        # update the hidden layers
-        # update the first layer with the inputs
-        for i in range(self.input_nodes, self.get_hidden_offset(1)):
-            # sum weighted input nodes for each hidden node, compare threshold, apply sigmoid
-            weight = 0.0
-            for j in range(self.input_nodes):
-                weight += self.weights[j][i] * self.values[j]
-            weight -= self.thresholds[i]
-            self.values[i] = sigmoid(weight)
+def run_network_sec4(data, expected):
+    file = open('results/sec4_ann.txt', 'w')
 
-        # update the remaining hidden layers
-        if self.hidden_layers > 1:
-            for i in range(1, self.hidden_layers):
-                offset = self.get_hidden_offset(i)
-                for j in range(offset, offset + self.hidden_nodes):
-                    # sum weighted input nodes for each hidden node, compare threshold, apply sigmoid
-                    weight = 0.0
-                    for k in range(offset):
-                        weight += self.weights[k][j] * self.values[j]
-                    weight -= self.thresholds[j]
-                    self.values[j] = sigmoid(weight)
+    for hidden_nodes in [50, 500, 1000]:
+        clf = MLPClassifier(solver='lbfgs',
+                            alpha=1e-5,
+                            hidden_layer_sizes=(hidden_nodes, hidden_nodes),
+                            random_state=1)
+        
+        scores = cross_val_score(clf, data, expected, cv=10)
+        file.write('ANN (Hidden Nodes: {}) - Accuracy: {} (+/- {})\n'.format(hidden_nodes, scores.mean(), scores.std() * 2))
 
-        # update the output nodes
-        for i in range(self.get_hidden_offset(self.hidden_layers), self.total_nodes):
-            # sum weighted hidden nodes for each output node, compare threshold, apply sigmoid
-            weight = 0.0
-            for j in range(self.get_hidden_offset(self.hidden_layers - 1), self.get_hidden_offset(self.hidden_layers)):
-                weight += self.weights[j][i] * self.values[j]
-            weight -= self.thresholds[i]
-            self.values[i] = sigmoid(weight)
-
-    def processErrors(self):
-        sumOfSquaredErrors = 0.0
-
-        # we only look at the output nodes for error calculation
-        for i in range(self.output_nodes):
-            offset = self.get_output_offset(i)
-            error = self.expectedValues[i] - self.values[offset]
-            #print error
-            sumOfSquaredErrors += math.pow(error, 2)
-            outputErrorGradient = self.values[offset] * (1 - self.values[offset]) * error
-            #print outputErrorGradient
-
-            # now update the weights and thresholds
-            for j in range(self.input_nodes, self.input_nodes + self.hidden_nodes):
-                # first update for the hidden nodes to output nodes (1 layer)
-                delta = self.learning_rate * self.values[j] * outputErrorGradient
-                # print delta
-                self.weights[j][offset] += delta
-                hiddenErrorGradient = self.values[j] * (1 - self.values[j]) * outputErrorGradient * self.weights[j][offset]
-
-                # and then update for the input nodes to hidden nodes
-                for k in range(self.input_nodes):
-                    delta = self.learning_rate * self.values[k] * hiddenErrorGradient
-                    self.weights[k][j] += delta
-
-                # update the thresholds for the hidden nodes
-                delta = self.learning_rate * -1 * hiddenErrorGradient
-                #print delta
-                self.thresholds[j] += delta
-
-            # update the thresholds for the output node(s)
-            delta = self.learning_rate * -1 * outputErrorGradient
-            self.thresholds[offset] += delta
-        return sumOfSquaredErrors
+    file.close()
